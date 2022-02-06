@@ -5,10 +5,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Surveyor App</title>
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
-    <link rel="manifest" href="/favicon/site.webmanifest">
+    <link rel="apple-touch-icon" sizes="180x180" href="./favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon/favicon-16x16.png">
+    <link rel="manifest" href="./favicon/site.webmanifest">
     <style>
         body {
             background-color: #061726;
@@ -16,6 +16,8 @@
             font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
             font-size: large;
         }
+
+        canvas { border: 1px solid #bcc2c6; }
     </style>
 </head>
 <body>
@@ -57,10 +59,17 @@
             X <input type="text" id="output-px" readonly />
             Y <input type="text" id="output-py" readonly />
         </div>
+        <hr>
+        <div>
+            <canvas id="canvas" width="400" height="400"></canvas>
+        </div>
     </div>
     <script>
         const executeButton = document.getElementById('execute');
         executeButton.addEventListener('click', calculate);
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
         function readNumber(id) {
             return parseFloat(document.getElementById(id).value, 10);
@@ -81,6 +90,117 @@
         function roundToPrecision(number, precision) {
             return number.toFixed(precision);
         }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function geoToCanvas(point) {
+            return {
+                x: canvas.height / 2 + point.y,
+                y: canvas.width / 2 - point.x,
+            }
+        }
+
+        function drawAxes() {
+            ctx.strokeStyle = 'orange';
+            ctx.fillStyle = 'orange';
+            ctx.lineWidth = 1;
+
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.lineTo(canvas.width - 10, canvas.height / 2 - 5);
+            ctx.moveTo(canvas.width, canvas.height / 2);
+            ctx.lineTo(canvas.width - 10, canvas.height / 2 + 5);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, canvas.height);
+            ctx.lineTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2 + 5, 10);
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2 - 5, 10);
+            ctx.stroke();
+
+            ctx.font = '12px serif';
+            ctx.textAlign = 'start';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillText('x', canvas.width / 2 + 10, 12);
+            ctx.fillText('y', canvas.width - 10 , canvas.height / 2 - 12);
+        }
+
+        function drawText(x, y, text) {
+            ctx.fillStyle = 'yellow';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '16px serif';
+            
+            const canvasPoint = geoToCanvas({x, y});
+            ctx.fillText(text, canvasPoint.x, canvasPoint.y);
+        }
+
+        function polarToGeo(angle, radius) {
+            return {
+                x: radius * Math.cos(angle),
+                y: radius * Math.sin(angle),
+            }
+        }
+
+        function angleToQuarter(angle) {
+            return Math.floor(radToGra(angle) / 100);
+        }
+
+        function getAvailableQuarter(angles) {
+            freeQuarters = [true, true, true, true];
+            for (angle of angles) {
+                freeQuarters[angleToQuarter(angle)] = false;
+            }
+
+            for (let i = 0; i < 4; i++) {
+                if (freeQuarters[i]) {
+                    return i;
+                }
+            }
+
+            return 0;
+        }
+
+        function drawAngle(angle, name) {
+            const pointRadius = 150;
+            const textRadius = 160;
+            ctx.strokeStyle = 'yellow';
+            ctx.lineWidth = 3;
+
+            const canvasPoint = geoToCanvas(polarToGeo(angle, pointRadius));
+            const textPoint = polarToGeo(angle, textRadius);
+
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, canvas.height / 2);
+            ctx.lineTo(canvasPoint.x, canvasPoint.y);
+            ctx.stroke();
+
+            drawText(textPoint.x, textPoint.y, name);
+        }
+
+        function drawResults(aziSN, aziSP) {
+            const coordsByQuarter = [
+                {x: 10, y: 10},
+                {x: -14, y: 10},
+                {x: -14, y: -10},
+                {x: 10, y: -10},
+            ];
+
+            const pointS = coordsByQuarter[getAvailableQuarter([aziSN, aziSP])];
+
+            clearCanvas();
+            drawAxes();
+            drawAngle(aziSN, 'N');
+            drawAngle(aziSP, 'P');
+            drawText(pointS.x, pointS.y, 'S');
+        }
+
+        drawAxes();
 
         function calculate() {
             const config = {
@@ -120,6 +240,8 @@
             writeResult('output-asp', roundToPrecision(radToGra(aziSP), config.precision.angle));
             writeResult('output-px', roundToPrecision(p.x, config.precision.coord));
             writeResult('output-py', roundToPrecision(p.y, config.precision.coord));
+
+            drawResults(aziSN, aziSP);
         }
     </script>
 </body>
